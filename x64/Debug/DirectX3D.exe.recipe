@@ -1,0 +1,54 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project>
+  <ProjectOutputs>
+    <ProjectOutput>
+      <FullPath>C:\Syusyoku\zankuu\x64\Debug\DirectX3D.exe</FullPath>
+    </ProjectOutput>
+  </ProjectOutputs>
+  <ContentFiles>
+    <ContentFile>
+      <FullPath>C:\Syusyoku\zankuu\x64\Debug\shader_pixel_2d.cso</FullPath>
+    </ContentFile>
+    <ContentFile>
+      <FullPath>C:\Syusyoku\zankuu\x64\Debug\shader_pixel_field.cso</FullPath>
+    </ContentFile>
+    <ContentFile>
+      <FullPath>C:\Syusyoku\zankuu\x64\Debug\shader_postprocess_directional_ps.cso</FullPath>
+    </ContentFile>
+    <ContentFile>
+      <FullPath>C:\Syusyoku\zankuu\x64\Debug\shader_postprocess_passthrough_ps.cso</FullPath>
+    </ContentFile>
+    <ContentFile>
+      <FullPath>C:\Syusyoku\zankuu\x64\Debug\shader_postprocess_radial_ps.cso</FullPath>
+    </ContentFile>
+    <ContentFile>
+      <FullPath>C:\Syusyoku\zankuu\x64\Debug\shader_postprocess_vs.cso</FullPath>
+    </ContentFile>
+    <ContentFile>
+      <FullPath>C:\Syusyoku\zankuu\x64\Debug\shader_vertex_2d.cso</FullPath>
+    </ContentFile>
+    <ContentFile>
+      <FullPath>C:\Syusyoku\zankuu\x64\Debug\shader_pixel_3d.cso</FullPath>
+    </ContentFile>
+    <ContentFile>
+      <FullPath>C:\Syusyoku\zankuu\x64\Debug\shader_vertex_3d.cso</FullPath>
+    </ContentFile>
+    <ContentFile>
+      <FullPath>C:\Syusyoku\zankuu\x64\Debug\shader_vertex_field.cso</FullPath>
+    </ContentFile>
+    <ContentFile>
+      <FullPath>C:\Syusyoku\zankuu\x64\Debug\shader_pixel_3d_unlit.cso</FullPath>
+    </ContentFile>
+    <ContentFile>
+      <FullPath>C:\Syusyoku\zankuu\x64\Debug\shader_pixel_billboard.cso</FullPath>
+    </ContentFile>
+    <ContentFile>
+      <FullPath>C:\Syusyoku\zankuu\x64\Debug\shader_vertex_3d_unlit.cso</FullPath>
+    </ContentFile>
+    <ContentFile>
+      <FullPath>C:\Syusyoku\zankuu\x64\Debug\shader_vertex_billboard.cso</FullPath>
+    </ContentFile>
+  </ContentFiles>
+  <SatelliteDlls />
+  <NonRecipeFileRefs />
+</Project>

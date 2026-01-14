@@ -1,0 +1,19 @@
+﻿  game_settings.cpp
+  settings.cpp
+C:\Syusyoku\zankuu\DirectX3D\settings.cpp(214,54): warning C4100: 'text': 引数は関数の本体部で 1 度も参照されません。
+  DirectX3D.vcxproj -> C:\Syusyoku\zankuu\x64\Debug\DirectX3D.exe
+  C:\Syusyoku\zankuu\x64\Debug\shader_pixel_2d.cso
+  C:\Syusyoku\zankuu\x64\Debug\shader_pixel_3d.cso
+  C:\Syusyoku\zankuu\x64\Debug\shader_pixel_3d_unlit.cso
+  C:\Syusyoku\zankuu\x64\Debug\shader_pixel_billboard.cso
+  C:\Syusyoku\zankuu\x64\Debug\shader_pixel_field.cso
+  C:\Syusyoku\zankuu\x64\Debug\shader_postprocess_directional_ps.cso
+  C:\Syusyoku\zankuu\x64\Debug\shader_postprocess_passthrough_ps.cso
+  C:\Syusyoku\zankuu\x64\Debug\shader_postprocess_radial_ps.cso
+  C:\Syusyoku\zankuu\x64\Debug\shader_postprocess_vs.cso
+  C:\Syusyoku\zankuu\x64\Debug\shader_vertex_2d.cso
+  C:\Syusyoku\zankuu\x64\Debug\shader_vertex_3d.cso
+  C:\Syusyoku\zankuu\x64\Debug\shader_vertex_3d_unlit.cso
+  C:\Syusyoku\zankuu\x64\Debug\shader_vertex_billboard.cso
+  C:\Syusyoku\zankuu\x64\Debug\shader_vertex_field.cso
+  14 個のファイルをコピーしました
