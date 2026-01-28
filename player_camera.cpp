@@ -5,6 +5,7 @@
  * @author Natsume Shidara
  * @date 2025/10/31
  * @update 2026/01/07 - 一人称視点に変更
+ * @update 2026/01/28 - カメラシェイク機能修正
  */
 #include "player_camera.h"
 #include <DirectXMath.h>
@@ -21,15 +22,26 @@ using namespace DirectX;
 //======================================
 // 定数
 //======================================
-static constexpr float DEFAULT_FOV = 1.0f;          // デフォルトFOV（約57度）
-static constexpr float MIN_FOV = 0.5f;
-static constexpr float MAX_FOV = 2.0f;
+namespace
+{
+    // FOV設定
+    constexpr float DEFAULT_FOV = 1.0f;          // デフォルトFOV（約57度）
+    constexpr float MIN_FOV = 0.5f;
+    constexpr float MAX_FOV = 2.0f;
 
-static const float DEFAULT_SENSITIVITY = GameSettings_GetSensitivity() * 0.005f; // マウス感度
-static constexpr float PAD_SENSITIVITY = 2.5f;       // パッド右スティック感度
-static constexpr float PAD_DEADZONE = 0.15f;         // パッドデッドゾーン
-static constexpr float MIN_PITCH = -XM_PIDIV2 + 0.1f; // 下限（約-80度）
-static constexpr float MAX_PITCH = XM_PIDIV2 - 0.1f;  // 上限（約+80度）
+    // 入力感度
+    constexpr float PAD_SENSITIVITY = 2.5f;      // パッド右スティック感度
+    constexpr float PAD_DEADZONE = 0.15f;        // パッドデッドゾーン
+
+    // 視点制限
+    constexpr float MIN_PITCH = -XM_PIDIV2 + 0.1f; // 下限（約-80度）
+    constexpr float MAX_PITCH = XM_PIDIV2 - 0.1f;  // 上限（約+80度）
+
+    // カメラシェイク設定
+    constexpr float SHAKE_FREQUENCY = XM_2PI * 20.0f;  // 振動周波数（20Hz）
+    constexpr float SHAKE_DECAY = 0.9f;                // 減衰率（毎フレーム）
+    constexpr float SHAKE_MIN_THRESHOLD = 0.001f;      // シェイク停止閾値
+}
 
 //======================================
 // 内部変数
@@ -44,7 +56,7 @@ static XMFLOAT3 g_EyeOffset = { 0.0f, 1.6f, 0.0f }; // プレイヤー頭の高�
 static float g_Yaw = 0.0f;      // 左右回転（ラジアン）
 static float g_Pitch = 0.0f;    // 上下回転（ラジアン）
 
-static float g_MouseSensitivity = DEFAULT_SENSITIVITY;
+static float g_MouseSensitivity = 0.0f;  // Initialize()で設定
 
 static XMFLOAT4X4 g_ViewMatrix{};
 static XMFLOAT4X4 g_PerspectiveMatrix{};
@@ -53,6 +65,10 @@ static XMFLOAT4X4 g_PerspectiveMatrix{};
 static float g_CurrentFOV = DEFAULT_FOV;
 static float g_TargetFOV = DEFAULT_FOV;
 static float g_FOVSpeed = 10.0f;
+
+// カメラシェイク
+static float g_CameraShakePower = 0.0f;
+static float g_CameraShakeTime = 0.0f;
 
 // 初回更新フラグ
 static bool g_FirstUpdate = true;
@@ -73,8 +89,13 @@ void PLCamera_Initialize(XMFLOAT3 eyeOffset)
     g_TargetFOV = DEFAULT_FOV;
     g_FOVSpeed = 10.0f;
 
-    g_MouseSensitivity = DEFAULT_SENSITIVITY;
+    // 感度初期化
+    g_MouseSensitivity = GameSettings_GetSensitivity() * 0.005f;
     g_FirstUpdate = true;
+
+    // カメラシェイク初期化
+    g_CameraShakePower = 0.0f;
+    g_CameraShakeTime = 0.0f;
 
     // 初期ビュー行列
     XMMATRIX identity = XMMatrixIdentity();
@@ -175,6 +196,28 @@ void PLCamera_Update(double elapsed_time)
     g_CameraPosition.y = playerPos.y + g_EyeOffset.y;
     g_CameraPosition.z = playerPos.z + g_EyeOffset.z;
 
+    //--------------------------------------
+    // カメラシェイク処理（ビュー行列計算前に適用）
+    //--------------------------------------
+    if (g_CameraShakePower > SHAKE_MIN_THRESHOLD)
+    {
+        // Y軸方向にシェイクオフセットを適用
+        float shakeOffset = g_CameraShakePower * cosf(g_CameraShakeTime);
+        g_CameraPosition.y += shakeOffset;
+
+        // 時間を進める
+        g_CameraShakeTime += SHAKE_FREQUENCY * dt;
+
+        // 減衰処理
+        g_CameraShakePower *= SHAKE_DECAY;
+    }
+    else
+    {
+        // シェイク終了
+        g_CameraShakePower = 0.0f;
+        g_CameraShakeTime = 0.0f;
+    }
+
     XMVECTOR vCameraPos = XMLoadFloat3(&g_CameraPosition);
 
     //--------------------------------------
@@ -274,4 +317,28 @@ void PLCamera_SetMouseSensitivity(float sensitivity)
 float PLCamera_GetMouseSensitivity()
 {
     return g_MouseSensitivity;
+}
+
+//======================================
+// カメラシェイク
+//======================================
+void PLCamera_Shake(float shakePower)
+{
+    // 現在のシェイクより強い場合のみ上書き
+    if (shakePower > g_CameraShakePower)
+    {
+        g_CameraShakePower = shakePower;
+        g_CameraShakeTime = 0.0f;
+    }
+}
+
+void PLCamera_StopShake()
+{
+    g_CameraShakePower = 0.0f;
+    g_CameraShakeTime = 0.0f;
+}
+
+bool PLCamera_IsShaking()
+{
+    return g_CameraShakePower > SHAKE_MIN_THRESHOLD;
 }

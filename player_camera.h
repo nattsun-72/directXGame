@@ -5,6 +5,7 @@
  * @author Natsume Shidara
  * @date 2025/10/31
  * @update 2026/01/07 - 一人称視点に変更
+ * @update 2026/01/28 - カメラシェイク機能追加
  */
 
 #ifndef PLAYER_CAMERA_H
@@ -50,5 +51,12 @@ float PLCamera_GetDefaultFOV();
 //======================================
 void PLCamera_SetMouseSensitivity(float sensitivity);
 float PLCamera_GetMouseSensitivity();
+
+//======================================
+// カメラシェイク
+//======================================
+void PLCamera_Shake(float shakePower);
+void PLCamera_StopShake();
+bool PLCamera_IsShaking();
 
 #endif // PLAYER_CAMERA_H

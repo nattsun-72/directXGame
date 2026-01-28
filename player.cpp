@@ -817,6 +817,7 @@ void Player_TakeDamage(int damage)
     g_Player.hp = std::max(0, g_Player.hp - damage);
     g_Player.invincibleTimer = 1.5f;
 
+    PLCamera_Shake(1.0f);
     // É_ÉÅÅ[ÉWSE
     SoundManager_PlaySE(SOUND_SE_PLAYER_DAMAGE);
 }
