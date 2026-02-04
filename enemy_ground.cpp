@@ -484,7 +484,7 @@ void EnemyGround::StateAttack::Update(float dt)
     pOwner->GetFireTimer() += dt;
     if (pOwner->GetFireTimer() >= EnemyGroundConfig::FIRE_INTERVAL)
     {
-        pOwner->FireBullet();
+        //pOwner->FireBullet();
         pOwner->GetFireTimer() = 0.0f;
     }
 }

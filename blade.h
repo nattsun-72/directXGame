@@ -4,11 +4,10 @@
  * @author Natsume Shidara
  * @date 2026/01/07
  * @update 2026/01/10 - リファクタリング
+ * @update 2026/02/03 - スタイリッシュ斬撃対応
  ****************************************/
-
 #ifndef BLADE_H
 #define BLADE_H
-
 #include <DirectXMath.h>
 
  //======================================
@@ -18,7 +17,7 @@ enum class BladeState
 {
     Idle,              // 待機
     FreeSlice,         // 自由斬撃（右クリック+ドラッグ）
-    FixedAttack,       // 固定攻撃（左クリック）- 縦斬り
+    FixedAttack,       // 固定攻撃（左クリック）- スタイリッシュ斬撃
     HorizontalSlash,   // 横なぎ攻撃（AirDash連動）
 };
 
@@ -39,7 +38,7 @@ void Blade_DebugDraw();
 //======================================
 // 外部トリガー（プレイヤーから呼び出し）
 //======================================
-void Blade_TriggerVerticalSlash();    // 縦斬り（通常攻撃）
+void Blade_TriggerVerticalSlash();    // スタイリッシュ斬撃（通常攻撃）
 void Blade_TriggerHorizontalSlash();  // 横なぎ（AirDash攻撃）
 
 //======================================
@@ -48,6 +47,7 @@ void Blade_TriggerHorizontalSlash();  // 横なぎ（AirDash攻撃）
 BladeState Blade_GetState();
 bool Blade_IsAttacking();
 int Blade_GetDebugMode();
+int Blade_GetCurrentPatternIndex();
 
 //======================================
 // 設定

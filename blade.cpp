@@ -6,6 +6,9 @@
  * @update 2026/01/10 - リファクタリング
  * @update 2026/01/13 - 切断法線計算の修正
  * @update 2026/01/13 - サウンド対応
+ * @update 2026/02/03 - スタイリッシュ斬撃アニメーション
+ * @update 2026/02/03 - 横薙ぎ復旧・速度調整
+ * @update 2026/02/03 - 斬撃フェーズ中の常時切断チェック
  ****************************************/
 
 #include "blade.h"
@@ -21,6 +24,7 @@
 #include "shader_shadow_map.h"
 #include "sound_manager.h"
 #include <cmath>
+#include <random>
 
 using namespace DirectX;
 
@@ -32,6 +36,31 @@ struct SliceParams
     XMFLOAT3 rayDirection;
     float rayLength;
     float planeSpread;
+};
+
+//======================================
+// 斬撃パターン構造体
+//======================================
+struct SlashPattern
+{
+    // 開始姿勢
+    XMFLOAT3 startRotation;
+    XMFLOAT3 startOffset;
+
+    // 終了姿勢
+    XMFLOAT3 endRotation;
+    XMFLOAT3 endOffset;
+
+    // タイミング
+    float windupRatio;      // 振りかぶり時間の割合
+    float strikeRatio;      // 斬撃時間の割合（残りはリカバリー）
+    float duration;         // 全体の長さ
+
+    // 切断方向（カメラ座標系）
+    XMFLOAT3 sliceDirection;
+
+    // サウンド
+    SoundID soundId;
 };
 
 //======================================
@@ -47,8 +76,12 @@ namespace
     constexpr float IDLE_SWAY_SPEED = 2.0f;
     constexpr float IDLE_SWAY_AMOUNT = 0.01f;
 
-    constexpr float FIXED_ATTACK_DURATION = 0.3f;
-    constexpr float HORIZONTAL_SLASH_DURATION = 0.2f;
+    // 横薙ぎ専用パラメータ
+    constexpr float HORIZONTAL_SLASH_DURATION = 0.35f;
+    constexpr float HORIZONTAL_ROT_X = 0.0f;
+    constexpr float HORIZONTAL_ROT_Z = 3.0f;
+    constexpr float HORIZONTAL_ROT_Y_START = 8.0f;
+    constexpr float HORIZONTAL_ROT_Y_END = 11.0f;
 
     constexpr float SLICE_ROTATION_SENSITIVITY = 0.005f;
     constexpr float SLICE_SWING_THRESHOLD = 2.0f;
@@ -59,22 +92,104 @@ namespace
         0.4f
     };
 
-    const SliceParams VERTICAL_SLICE = {
-        { 0.0f, -0.4f, -1.0f },
-        7.5f,
-        0.4f
-    };
-
     const SliceParams HORIZONTAL_SLICE = {
         { 0.0f, 0.0f, -1.0f },
         7.5f,
         0.4f
     };
 
-    constexpr float HORIZONTAL_ROT_X = 0.0f;
-    constexpr float HORIZONTAL_ROT_Z = 3.0f;
-    constexpr float HORIZONTAL_ROT_Y_START = 8.0f;
-    constexpr float HORIZONTAL_ROT_Y_END = 11.0f;
+    //======================================
+    // 斬撃パターン定義
+    //======================================
+
+    // パターン1: 右上→左下（袈裟斬り）
+    const SlashPattern SLASH_KESA = {
+        .startRotation = { -0.6f, -0.4f, -0.8f },
+        .startOffset = { 0.15f, 0.1f, 0.0f },
+        .endRotation = { 0.8f, 0.5f, 1.2f },
+        .endOffset = { -0.1f, -0.15f, 0.0f },
+        .windupRatio = 0.2f,
+        .strikeRatio = 0.35f,
+        .duration = 0.45f,
+        .sliceDirection = { -0.7f, -0.7f, 0.0f },
+        .soundId = SOUND_SE_SLASH_HEAVY
+    };
+
+    // パターン2: 左上→右下（逆袈裟）
+    const SlashPattern SLASH_REVERSE_KESA = {
+        .startRotation = { -0.5f, 0.5f, 0.9f },
+        .startOffset = { -0.1f, 0.12f, 0.0f },
+        .endRotation = { 0.7f, -0.4f, -1.0f },
+        .endOffset = { 0.15f, -0.12f, 0.0f },
+        .windupRatio = 0.2f,
+        .strikeRatio = 0.35f,
+        .duration = 0.45f,
+        .sliceDirection = { 0.7f, -0.7f, 0.0f },
+        .soundId = SOUND_SE_SLASH_HEAVY
+    };
+
+    // パターン3: 右横薙ぎ
+    const SlashPattern SLASH_RIGHT_SWEEP = {
+        .startRotation = { 0.0f, -0.6f, -1.2f },
+        .startOffset = { 0.2f, 0.0f, 0.0f },
+        .endRotation = { 0.1f, 0.7f, 0.8f },
+        .endOffset = { -0.15f, -0.05f, 0.0f },
+        .windupRatio = 0.15f,
+        .strikeRatio = 0.4f,
+        .duration = 0.38f,
+        .sliceDirection = { -1.0f, 0.0f, 0.0f },
+        .soundId = SOUND_SE_SLASH
+    };
+
+    // パターン4: 左横薙ぎ
+    const SlashPattern SLASH_LEFT_SWEEP = {
+        .startRotation = { 0.0f, 0.6f, 1.0f },
+        .startOffset = { -0.15f, 0.0f, 0.0f },
+        .endRotation = { 0.1f, -0.6f, -0.9f },
+        .endOffset = { 0.18f, -0.05f, 0.0f },
+        .windupRatio = 0.15f,
+        .strikeRatio = 0.4f,
+        .duration = 0.38f,
+        .sliceDirection = { 1.0f, 0.0f, 0.0f },
+        .soundId = SOUND_SE_SLASH
+    };
+
+    // パターン5: 突き上げ斬り（下から上へ）
+    const SlashPattern SLASH_RISING = {
+        .startRotation = { 1.0f, 0.2f, 0.3f },
+        .startOffset = { 0.05f, -0.15f, 0.05f },
+        .endRotation = { -0.8f, -0.1f, -0.2f },
+        .endOffset = { 0.0f, 0.1f, -0.05f },
+        .windupRatio = 0.25f,
+        .strikeRatio = 0.35f,
+        .duration = 0.5f,
+        .sliceDirection = { 0.0f, 1.0f, 0.0f },
+        .soundId = SOUND_SE_SLASH_HEAVY
+    };
+
+    // パターン6: 鋭い縦斬り
+    const SlashPattern SLASH_QUICK_VERTICAL = {
+        .startRotation = { -0.7f, 0.0f, 0.0f },
+        .startOffset = { 0.0f, 0.08f, 0.0f },
+        .endRotation = { 1.2f, 0.0f, 0.0f },
+        .endOffset = { 0.0f, -0.1f, 0.0f },
+        .windupRatio = 0.15f,
+        .strikeRatio = 0.35f,
+        .duration = 0.35f,
+        .sliceDirection = { 0.0f, -1.0f, 0.0f },
+        .soundId = SOUND_SE_SLASH
+    };
+
+    // パターン配列
+    const SlashPattern* SLASH_PATTERNS[] = {
+        &SLASH_KESA,
+        &SLASH_REVERSE_KESA,
+        &SLASH_RIGHT_SWEEP,
+        &SLASH_LEFT_SWEEP,
+        &SLASH_RISING,
+        &SLASH_QUICK_VERTICAL
+    };
+    constexpr int NUM_SLASH_PATTERNS = sizeof(SLASH_PATTERNS) / sizeof(SLASH_PATTERNS[0]);
 
     XMFLOAT3 BLADE_TIP_OFFSET = { 0.0f, 0.02f, -0.6f };
     constexpr XMFLOAT4 TRAIL_COLOR = { 0.2f, 0.5f, 1.0f, 0.4f };
@@ -85,6 +200,36 @@ namespace
 #ifdef _DEBUG
     constexpr float DEBUG_ADJUST_SPEED = 0.02f;
 #endif
+}
+
+//======================================
+// イージング関数
+//======================================
+namespace Easing
+{
+    inline float OutQuad(float t)
+    {
+        return 1.0f - (1.0f - t) * (1.0f - t);
+    }
+
+    inline float InOutExpo(float t)
+    {
+        if (t < 0.5f)
+            return (powf(2.0f, 20.0f * t - 10.0f)) / 2.0f;
+        return (2.0f - powf(2.0f, -20.0f * t + 10.0f)) / 2.0f;
+    }
+
+    inline float OutCubic(float t)
+    {
+        return 1.0f - powf(1.0f - t, 3.0f);
+    }
+
+    inline float OutBack(float t)
+    {
+        constexpr float c1 = 1.70158f;
+        constexpr float c3 = c1 + 1.0f;
+        return 1.0f + c3 * powf(t - 1.0f, 3.0f) + c1 * powf(t - 1.0f, 2.0f);
+    }
 }
 
 //======================================
@@ -106,6 +251,11 @@ static bool g_IsDragging = false;
 static float g_SliceMouseAccumX = 0.0f;
 static float g_SliceMouseAccumY = 0.0f;
 
+// 斬撃パターン管理
+static int g_CurrentPatternIndex = 0;
+static int g_LastPatternIndex = -1;
+static std::mt19937 g_Rng;
+
 static XMMATRIX g_BladeWorldMatrix = XMMatrixIdentity();
 
 #ifdef _DEBUG
@@ -122,16 +272,59 @@ static bool g_DebugRayValid = false;
 static void ChangeState(BladeState newState);
 static void UpdateState_Idle(float dt);
 static void UpdateState_FreeSlice(float dt);
-static void UpdateState_FixedAttack(float dt);
+static void UpdateState_StylishSlash(float dt);
 static void UpdateState_HorizontalSlash(float dt);
 static XMFLOAT3 GetBladeTipWorldPosition();
 static void SpawnTrailAtBladeTip();
 static XMFLOAT3 GetCameraUp();
 static void PerformSlice(const XMFLOAT3& sliceNormal, const SliceParams& params);
+static int SelectNextPattern();
+static XMFLOAT3 LerpFloat3(const XMFLOAT3& a, const XMFLOAT3& b, float t);
+static XMFLOAT3 GetWorldSliceDirection(const XMFLOAT3& localDir);
 
 #ifdef _DEBUG
 static void DebugUpdate();
 #endif
+
+//======================================
+// ユーティリティ関数
+//======================================
+static XMFLOAT3 LerpFloat3(const XMFLOAT3& a, const XMFLOAT3& b, float t)
+{
+    return {
+        a.x + (b.x - a.x) * t,
+        a.y + (b.y - a.y) * t,
+        a.z + (b.z - a.z) * t
+    };
+}
+
+static XMFLOAT3 GetWorldSliceDirection(const XMFLOAT3& localDir)
+{
+    XMFLOAT3 camRight = PLCamera_GetRight();
+    XMFLOAT3 camUp = GetCameraUp();
+    XMFLOAT3 camFront = PLCamera_GetFront();
+
+    return {
+        camRight.x * localDir.x + camUp.x * localDir.y + camFront.x * localDir.z,
+        camRight.y * localDir.x + camUp.y * localDir.y + camFront.y * localDir.z,
+        camRight.z * localDir.x + camUp.z * localDir.y + camFront.z * localDir.z
+    };
+}
+
+static int SelectNextPattern()
+{
+    std::uniform_int_distribution<int> dist(0, NUM_SLASH_PATTERNS - 1);
+    int next = dist(g_Rng);
+
+    // 連続で同じパターンを避ける（最大3回試行）
+    for (int i = 0; i < 3 && next == g_LastPatternIndex; ++i)
+    {
+        next = dist(g_Rng);
+    }
+
+    g_LastPatternIndex = next;
+    return next;
+}
 
 //======================================
 // 初期化
@@ -152,6 +345,11 @@ void Blade_Initialize()
     g_LocalRotation = { 0.0f, 0.0f, 0.0f };
     g_ModelRotationOffset = MODEL_ROTATION_OFFSET;
     g_Scale = MODEL_SCALE;
+
+    // 乱数初期化
+    std::random_device rd;
+    g_Rng.seed(rd());
+    g_LastPatternIndex = -1;
 
 #ifdef _DEBUG
     g_DebugRayValid = false;
@@ -182,26 +380,27 @@ static void ChangeState(BladeState newState)
 
     switch (newState)
     {
-    case BladeState::Idle:
-        g_LocalRotation = { 0.0f, 0.0f, 0.0f };
-        g_ModelRotationOffset = MODEL_ROTATION_OFFSET;
-        break;
+        case BladeState::Idle:
+            g_LocalRotation = { 0.0f, 0.0f, 0.0f };
+            g_LocalPosition = { 0.0f, 0.0f, 0.0f };
+            g_ModelRotationOffset = MODEL_ROTATION_OFFSET;
+            break;
 
-    case BladeState::FreeSlice:
-        g_SliceMouseAccumX = 0.0f;
-        g_SliceMouseAccumY = 0.0f;
-        SoundManager_PlaySE(SOUND_SE_SLASH);
-        break;
+        case BladeState::FreeSlice:
+            g_SliceMouseAccumX = 0.0f;
+            g_SliceMouseAccumY = 0.0f;
+            SoundManager_PlaySE(SOUND_SE_SLASH);
+            break;
 
-    case BladeState::FixedAttack:
-        g_LocalRotation = { 0.0f, 0.0f, 0.0f };
-        SoundManager_PlaySE(SOUND_SE_SLASH_HEAVY);
-        break;
+        case BladeState::FixedAttack:
+            g_CurrentPatternIndex = SelectNextPattern();
+            SoundManager_PlaySE(SLASH_PATTERNS[g_CurrentPatternIndex]->soundId);
+            break;
 
-    case BladeState::HorizontalSlash:
-        g_LocalRotation = { 0.0f, 0.0f, 0.0f };
-        SoundManager_PlaySE(SOUND_SE_SLASH);
-        break;
+        case BladeState::HorizontalSlash:
+            g_LocalRotation = { 0.0f, 0.0f, 0.0f };
+            SoundManager_PlaySE(SOUND_SE_SLASH);
+            break;
     }
 }
 
@@ -298,47 +497,77 @@ static void UpdateState_FreeSlice(float dt)
 }
 
 //======================================
-// 状態別更新: 固定攻撃（縦斬り）
+// 状態別更新: スタイリッシュ斬撃
 //======================================
-static void UpdateState_FixedAttack(float dt)
+static void UpdateState_StylishSlash(float dt)
 {
+    const SlashPattern& pattern = *SLASH_PATTERNS[g_CurrentPatternIndex];
+
     g_StateTimer += dt;
-    float t = g_StateTimer / FIXED_ATTACK_DURATION;
+    float t = g_StateTimer / pattern.duration;
 
-    constexpr float SWING_UP_ANGLE = -0.8f;
-    constexpr float SWING_DOWN_ANGLE = 3.2f;
+    float windupEnd = pattern.windupRatio;
+    float strikeEnd = pattern.windupRatio + pattern.strikeRatio;
 
-    if (t < 0.25f)
+    XMFLOAT3 targetRot;
+    XMFLOAT3 targetOffset;
+
+    if (t < windupEnd)
     {
-        g_LocalRotation.x = (t / 0.25f) * SWING_UP_ANGLE;
+        // 振りかぶりフェーズ
+        float phaseT = t / windupEnd;
+        float eased = Easing::OutQuad(phaseT);
+
+        targetRot = LerpFloat3({ 0.0f, 0.0f, 0.0f }, pattern.startRotation, eased);
+        targetOffset = LerpFloat3({ 0.0f, 0.0f, 0.0f }, pattern.startOffset, eased);
     }
-    else if (t < 0.5f)
+    else if (t < strikeEnd)
     {
-        float phase = (t - 0.25f) / 0.25f;
-        g_LocalRotation.x = SWING_UP_ANGLE + phase * (SWING_DOWN_ANGLE - SWING_UP_ANGLE);
+        // 斬撃フェーズ
+        float phaseT = (t - windupEnd) / pattern.strikeRatio;
+        float eased = Easing::InOutExpo(phaseT);
+
+        targetRot = LerpFloat3(pattern.startRotation, pattern.endRotation, eased);
+        targetOffset = LerpFloat3(pattern.startOffset, pattern.endOffset, eased);
+
+        // トレイル生成
         SpawnTrailAtBladeTip();
-        PerformSlice(PLCamera_GetRight(), VERTICAL_SLICE);
+
+        // 切断チェック（毎フレーム実行）
+        XMFLOAT3 worldSliceDir = GetWorldSliceDirection(pattern.sliceDirection);
+        XMVECTOR vDir = XMVector3Normalize(XMLoadFloat3(&worldSliceDir));
+        XMStoreFloat3(&worldSliceDir, vDir);
+
+        PerformSlice(worldSliceDir, DEFAULT_SLICE);
     }
     else
     {
-        float phase = (t - 0.5f) / 0.5f;
-        g_LocalRotation.x = SWING_DOWN_ANGLE * (1.0f - phase);
+        // リカバリーフェーズ
+        float phaseT = (t - strikeEnd) / (1.0f - strikeEnd);
+        float eased = Easing::OutCubic(phaseT);
+
+        targetRot = LerpFloat3(pattern.endRotation, { 0.0f, 0.0f, 0.0f }, eased);
+        targetOffset = LerpFloat3(pattern.endOffset, { 0.0f, 0.0f, 0.0f }, eased);
     }
 
-    if (g_StateTimer >= FIXED_ATTACK_DURATION)
+    g_LocalRotation = targetRot;
+    g_LocalPosition = targetOffset;
+
+    if (g_StateTimer >= pattern.duration)
     {
         ChangeState(BladeState::Idle);
     }
 }
 
 //======================================
-// 状態別更新: 横なぎ攻撃
+// 状態別更新: 横なぎ攻撃（AirDash専用）
 //======================================
 static void UpdateState_HorizontalSlash(float dt)
 {
     g_StateTimer += dt;
     float t = g_StateTimer / HORIZONTAL_SLASH_DURATION;
 
+    // イーズアウト（最初速く、後半減速）
     float easeT = 1.0f - (1.0f - t) * (1.0f - t);
 
     g_ModelRotationOffset.x = HORIZONTAL_ROT_X;
@@ -347,9 +576,11 @@ static void UpdateState_HorizontalSlash(float dt)
 
     g_LocalRotation = { 0.0f, 0.0f, 0.0f };
 
+    // トレイル生成
     SpawnTrailAtBladeTip();
 
-    if (t > 0.2f && t < 0.8f)
+    // 切断チェック（斬撃フェーズ中は毎フレーム実行）
+    if (t > 0.15f && t < 0.85f)
     {
         PerformSlice(GetCameraUp(), HORIZONTAL_SLICE);
     }
@@ -411,10 +642,18 @@ void Blade_Update(double elapsed_time)
 
     switch (g_State)
     {
-    case BladeState::Idle:           UpdateState_Idle(dt);           break;
-    case BladeState::FreeSlice:      UpdateState_FreeSlice(dt);      break;
-    case BladeState::FixedAttack:    UpdateState_FixedAttack(dt);    break;
-    case BladeState::HorizontalSlash: UpdateState_HorizontalSlash(dt); break;
+        case BladeState::Idle:
+            UpdateState_Idle(dt);
+            break;
+        case BladeState::FreeSlice:
+            UpdateState_FreeSlice(dt);
+            break;
+        case BladeState::FixedAttack:
+            UpdateState_StylishSlash(dt);
+            break;
+        case BladeState::HorizontalSlash:
+            UpdateState_HorizontalSlash(dt);
+            break;
     }
 }
 
@@ -574,6 +813,11 @@ int Blade_GetDebugMode()
 #else
     return 0;
 #endif
+}
+
+int Blade_GetCurrentPatternIndex()
+{
+    return g_CurrentPatternIndex;
 }
 
 //======================================

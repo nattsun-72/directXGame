@@ -1,8 +1,6 @@
-﻿  billboard.cpp
-  blade.cpp
-  game.cpp
-  map.cpp
-  player.cpp
-  player_camera.cpp
+﻿C:\Syusyoku\zankuu\DirectX3D\shaders\shader_pixel_3d.hlsl(95,5): warning X4000: use of potentially uninitialized variable (CalcShadowFactor)
+  
+  compilation object save succeeded; see C:\Syusyoku\zankuu\x64\Debug\shader_pixel_3d.cso
   DirectX3D.vcxproj -> C:\Syusyoku\zankuu\x64\Debug\DirectX3D.exe
-  0 個のファイルをコピーしました
+  C:\Syusyoku\zankuu\x64\Debug\shader_pixel_3d.cso
+  1 個のファイルをコピーしました

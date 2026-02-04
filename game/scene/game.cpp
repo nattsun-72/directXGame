@@ -88,9 +88,9 @@ namespace
     constexpr XMFLOAT3 PLAYER_START_FRONT = { 0.0f, 0.0f, 1.0f };
 
     constexpr XMFLOAT3 LIGHT_OFFSET = { 25.0f, 50.0f, -25.0f };
-    constexpr XMFLOAT4 LIGHT_DIRECTION = { -0.4f, -0.8f, 0.4f, 0.0f };
-    constexpr XMFLOAT4 LIGHT_COLOR = { 1.0f, 0.95f, 0.9f, 1.0f };
-    constexpr XMFLOAT3 AMBIENT_COLOR = { 0.35f, 0.35f, 0.4f };
+    constexpr XMFLOAT4 LIGHT_DIRECTION = { -0.3f, -0.75f, 0.3f, 0.0f };  // è≠ÇµêÛÇ¢äpìxÇ…
+    constexpr XMFLOAT4 LIGHT_COLOR = { 1.1f, 1.08f, 1.0f, 1.0f };        // è≠ÇµígêFäÒÇËÇ≈ã≠Çﬂ
+    constexpr XMFLOAT3 AMBIENT_COLOR = { 0.5f, 0.5f, 0.55f };            // ä¬ã´åıÇè„Ç∞ÇÈ
 
 #ifdef _DEBUG
     constexpr XMFLOAT3 DEBUG_CAMERA_POSITION = { 0.0f, 20.0f, -40.0f };
