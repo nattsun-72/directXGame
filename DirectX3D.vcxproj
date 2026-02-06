@@ -222,6 +222,8 @@
     <ClCompile Include="meshfield.cpp" />
     <ClCompile Include="model.cpp" />
     <ClCompile Include="pad_logger.cpp" />
+    <ClCompile Include="particle.cpp" />
+    <ClCompile Include="particle_test.cpp" />
     <ClCompile Include="physics_model.cpp" />
     <ClCompile Include="player.cpp" />
     <ClCompile Include="player_camera.cpp" />
@@ -294,6 +296,8 @@
     <ClInclude Include="meshfield.h" />
     <ClInclude Include="model.h" />
     <ClInclude Include="pad_logger.h" />
+    <ClInclude Include="particle.h" />
+    <ClInclude Include="particle_test.h" />
     <ClInclude Include="physics_model.h" />
     <ClInclude Include="player.h" />
     <ClInclude Include="player_camera.h" />

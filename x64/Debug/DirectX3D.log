@@ -1,6 +1,3 @@
-﻿C:\Syusyoku\zankuu\DirectX3D\shaders\shader_pixel_3d.hlsl(95,5): warning X4000: use of potentially uninitialized variable (CalcShadowFactor)
-  
-  compilation object save succeeded; see C:\Syusyoku\zankuu\x64\Debug\shader_pixel_3d.cso
+﻿  particle_test.cpp
   DirectX3D.vcxproj -> C:\Syusyoku\zankuu\x64\Debug\DirectX3D.exe
-  C:\Syusyoku\zankuu\x64\Debug\shader_pixel_3d.cso
-  1 個のファイルをコピーしました
+  0 個のファイルをコピーしました

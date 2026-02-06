@@ -10,6 +10,7 @@
  * @author Natsume Shidara
  * @update 2026/01/13 - ステージ＆ランダムスポーン追加
  * @update 2026/01/13 - サウンド対応・デバッグ機能分離
+ * @update 2026/02/04 - パーティクルシステム追加
  ****************************************/
 
 #include "game.h"
@@ -53,6 +54,9 @@
 #include "combo.h"
 #include "scene.h"
 #include "fade.h"
+
+#include "particle_test.h"
+
 #include "sound_manager.h"
 
 #ifdef _DEBUG
@@ -88,9 +92,9 @@ namespace
     constexpr XMFLOAT3 PLAYER_START_FRONT = { 0.0f, 0.0f, 1.0f };
 
     constexpr XMFLOAT3 LIGHT_OFFSET = { 25.0f, 50.0f, -25.0f };
-    constexpr XMFLOAT4 LIGHT_DIRECTION = { -0.3f, -0.75f, 0.3f, 0.0f };  // 少し浅い角度に
-    constexpr XMFLOAT4 LIGHT_COLOR = { 1.1f, 1.08f, 1.0f, 1.0f };        // 少し暖色寄りで強め
-    constexpr XMFLOAT3 AMBIENT_COLOR = { 0.5f, 0.5f, 0.55f };            // 環境光を上げる
+    constexpr XMFLOAT4 LIGHT_DIRECTION = { -0.3f, -0.75f, 0.3f, 0.0f };
+    constexpr XMFLOAT4 LIGHT_COLOR = { 1.1f, 1.08f, 1.0f, 1.0f };
+    constexpr XMFLOAT3 AMBIENT_COLOR = { 0.5f, 0.5f, 0.55f };
 
 #ifdef _DEBUG
     constexpr XMFLOAT3 DEBUG_CAMERA_POSITION = { 0.0f, 20.0f, -40.0f };
@@ -111,6 +115,8 @@ static float g_GameElapsedTime = 0.0f;
 
 static bool g_IsGameOver = false;
 static bool g_IsTransitioning = false;
+
+static NormalEmitter* g_pTestEmitter = nullptr;
 
 #ifdef _DEBUG
 static bool g_IsDebugCamera = false;
@@ -210,6 +216,10 @@ void Game_Initialize()
     SoundManager_PlayBGM(SOUND_BGM_GAME);
 
     Fade_Start(1.0, false);
+
+    // パーティクルエミッター初期化
+    XMVECTOR emitterPos = XMVectorSet(0.0f, 2.0f, 5.0f, 0.0f);
+    g_pTestEmitter = new NormalEmitter(100, emitterPos, 10.0, true);
 }
 
 //======================================
@@ -217,6 +227,13 @@ void Game_Initialize()
 //======================================
 void Game_Finalize()
 {
+    // パーティクル解放
+    if (g_pTestEmitter)
+    {
+        delete g_pTestEmitter;
+        g_pTestEmitter = nullptr;
+    }
+
 #ifdef _DEBUG
     DebugRenderer::Finalize();
 #endif
@@ -334,6 +351,12 @@ static void UpdateObjects(float dt)
     Bullet_Update(dt);
     BulletHItEffect_Update(dt);
     Trail_Update(dt);
+
+    // パーティクル更新
+    if (g_pTestEmitter)
+    {
+        g_pTestEmitter->Update(dt);
+    }
 }
 
 //--------------------------------------
@@ -562,6 +585,12 @@ static void DrawScene()
 
     BulletHItEffect_Draw();
     Trail_Draw();
+
+    // パーティクル描画
+    if (g_pTestEmitter)
+    {
+        g_pTestEmitter->Draw();
+    }
 }
 
 #ifdef _DEBUG

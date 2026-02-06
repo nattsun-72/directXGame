@@ -155,8 +155,9 @@ void Billboard_Update(double deltaTime)
 void Billboard_Draw(int texId, const DirectX::XMFLOAT3& position, const XMFLOAT2& scale, const XMFLOAT2& pivot,const XMFLOAT4& color)
 {
 
-    Shader_Billboard_SetUVParameter({ { 0.2f, 0.5f }, { 0.2f * 3.0f, 0.5f * 2.0f } });
+    //Shader_Billboard_SetUVParameter({ { 0.2f, 0.5f }, { 0.2f * 3.0f, 0.5f * 2.0f } });
 
+    Shader_Billboard_SetUVParameter({ { 1.0f, 1.0f }, { 0.0f, 0.0f } });
     if (!g_pContext || !g_pVertexBuffer)
     {
         hal::dout << "Billboard_Draw: 無効なコンテキストまたは頂点バッファ" << std::endl;

@@ -258,6 +258,12 @@
     <ClCompile Include="game_settings.cpp">
       <Filter>ソースファイル</Filter>
     </ClCompile>
+    <ClCompile Include="particle.cpp">
+      <Filter>ソースファイル</Filter>
+    </ClCompile>
+    <ClCompile Include="particle_test.cpp">
+      <Filter>ソースファイル</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="audio\Audio.h">
@@ -477,6 +483,12 @@
       <Filter>ヘッダーファイル</Filter>
     </ClInclude>
     <ClInclude Include="settings.h">
+      <Filter>ヘッダーファイル</Filter>
+    </ClInclude>
+    <ClInclude Include="particle.h">
+      <Filter>ヘッダーファイル</Filter>
+    </ClInclude>
+    <ClInclude Include="particle_test.h">
       <Filter>ヘッダーファイル</Filter>
     </ClInclude>
   </ItemGroup>
