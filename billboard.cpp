@@ -1,16 +1,14 @@
 /****************************************
- * billboard.cpp
+ * billboard.cpp (改善版)
  *
  * 概要:
  *   ビルボード描画モジュール
  *   - カメラに常に正面を向く平面を描画
  *   - テクスチャ付き
  *
- * 主な機能:
- *   Billboard_Initialize() : 初期化
- *   Billboard_Finalize()   : 解放
- *   Billboard_Update(...)  : 更新
- *   Billboard_Draw(...)    : 描画
+ * 変更点:
+ *   - 深度ステートの制御を呼び出し側に委譲
+ *   - パーティクル描画での深度書き込み制御に対応
  ****************************************/
 #include "billboard.h"
 #include <DirectXMath.h>
@@ -152,12 +150,9 @@ void Billboard_Update(double deltaTime)
 //======================================
 // 描画処理
 //======================================
-void Billboard_Draw(int texId, const DirectX::XMFLOAT3& position, const XMFLOAT2& scale, const XMFLOAT2& pivot,const XMFLOAT4& color)
+void Billboard_Draw(int texId, const DirectX::XMFLOAT3& position, const XMFLOAT2& scale, const XMFLOAT2& pivot, const XMFLOAT4& color)
 {
 
-    //Shader_Billboard_SetUVParameter({ { 0.2f, 0.5f }, { 0.2f * 3.0f, 0.5f * 2.0f } });
-
-    Shader_Billboard_SetUVParameter({ { 1.0f, 1.0f }, { 0.0f, 0.0f } });
     if (!g_pContext || !g_pVertexBuffer)
     {
         hal::dout << "Billboard_Draw: 無効なコンテキストまたは頂点バッファ" << std::endl;
@@ -167,11 +162,10 @@ void Billboard_Draw(int texId, const DirectX::XMFLOAT3& position, const XMFLOAT2
     // シェーダーを開始
     Shader_Billboard_Begin();
 
-    // カラーを設定(現在のピクセルシェーダーでは使用されないが、互換性のため)
+    Shader_Billboard_SetUVParameter({ { 1.0f, 1.0f }, { 0.0f, 0.0f } });
+    // カラーを設定
     Shader_Billboard_SetColor(color);
 
-    // 深度テスト有効(深度書き込みは無効にすることを推奨)
-    Direct3D_DepthStencilStateDepthIsEnable(true);
 
     // テクスチャをセット
     Texture_SetTexture(texId);
@@ -203,13 +197,11 @@ void Billboard_Draw(int texId, const DirectX::XMFLOAT3& position, const XMFLOAT2
 
 void Billboard_Draw(int texId, const DirectX::XMFLOAT3& position, const DirectX::XMFLOAT2& scale, const DirectX::XMFLOAT4& tex_cut, const DirectX::XMFLOAT2& pivot, const XMFLOAT4& color)
 {
-
     float uv_x = static_cast<float>(tex_cut.x / Texture_Width(texId));
     float uv_y = static_cast<float>(tex_cut.y / Texture_Height(texId));
     float uv_w = static_cast<float>(tex_cut.z / Texture_Width(texId));
     float uv_h = static_cast<float>(tex_cut.w / Texture_Height(texId));
 
-    Shader_Billboard_SetUVParameter({ { uv_w, uv_h }, { uv_x, uv_y } });
 
     if (!g_pContext || !g_pVertexBuffer)
     {
@@ -219,12 +211,12 @@ void Billboard_Draw(int texId, const DirectX::XMFLOAT3& position, const DirectX:
 
     // シェーダーを開始
     Shader_Billboard_Begin();
+    
+    Shader_Billboard_SetUVParameter({ { uv_w, uv_h }, { uv_x, uv_y } });
 
-    // カラーを設定(現在のピクセルシェーダーでは使用されないが、互換性のため)
+    // カラーを設定
     Shader_Billboard_SetColor(color);
 
-    // 深度テスト有効(深度書き込みは無効にすることを推奨)
-    Direct3D_DepthStencilStateDepthIsEnable(true);
 
     // テクスチャをセット
     Texture_SetTexture(texId);

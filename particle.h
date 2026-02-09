@@ -72,7 +72,11 @@ public:
 
     virtual void Update(double elapsedTime) {
         m_accumulatedTime += elapsedTime;
-        m_lifeTime -= elapsedTime;
+
+        if(m_accumulatedTime >= m_lifeTime){
+            Destroy();
+        }
+
     }
 
     virtual void Draw() const = 0;

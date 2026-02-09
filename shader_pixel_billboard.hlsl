@@ -26,17 +26,10 @@ SamplerState samp : register(s0); // サンプラー
 // ピクセルシェーダー
 float4 main(PS_INPUT ps_in) : SV_TARGET
 {
-    // テクスチャサンプリング
     float4 texColor = tex.Sample(samp, ps_in.uv);
     
+    // RGB にカラーとアルファを乗算（加算合成の輝度制御）
+    float3 finalRGB = texColor.rgb * ps_in.color.rgb * materialColor.rgb * materialColor.a;
     
-    //アルファテスト
-    if (texColor.a < 0.01f)
-    {
-        //引数指定で書く書かないを定められる。
-        clip(-1);
-    }
-    
-    // 頂点カラー、マテリアルカラー、テクスチャカラーを乗算
-        return texColor * ps_in.color * materialColor;
+    return float4(finalRGB, 1.0f); // αは1.0固定、輝度はRGBで制御
 }

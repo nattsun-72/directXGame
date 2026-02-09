@@ -286,5 +286,5 @@ void Shader_Billboard_Begin()
     g_pContext->PSSetConstantBuffers(0, 1, &g_pPSConstantBuffer0);
 
     // ƒTƒ“ƒvƒ‰İ’è
-    Sampler_SetFilterPoint();
+    Sampler_SetFilterLinear();
 }

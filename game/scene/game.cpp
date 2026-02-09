@@ -11,6 +11,7 @@
  * @update 2026/01/13 - ステージ＆ランダムスポーン追加
  * @update 2026/01/13 - サウンド対応・デバッグ機能分離
  * @update 2026/02/04 - パーティクルシステム追加
+ * @update 2026/02/06 - リファクタリング（行列取得の一元化・冗長分岐の削減）
  ****************************************/
 
 #include "game.h"
@@ -143,6 +144,24 @@ static void ProcessDebugInput();
 static void DrawDebugOverlay(const XMFLOAT4X4& mtxView, const XMFLOAT4X4& mtxProj);
 #endif
 
+//--------------------------------------
+// ビュー・プロジェクション行列の一元取得
+// ※ デバッグカメラ / プレイヤーカメラの分岐を1箇所に集約
+//--------------------------------------
+static void GetActiveMatrices(XMFLOAT4X4& outView, XMFLOAT4X4& outProj)
+{
+#ifdef _DEBUG
+    if (g_IsDebugCamera)
+    {
+        outView = Camera_GetViewMatrix();
+        outProj = Camera_GetPerspectiveMatrix();
+        return;
+    }
+#endif
+    outView = PLCamera_GetViewMatrix();
+    outProj = PLCamera_GetPerspectiveMatrix();
+}
+
 //======================================
 // ゲーム初期化
 //======================================
@@ -160,7 +179,6 @@ void Game_Initialize()
     Camera_Initialize();
 
 #ifdef _DEBUG
-    // デバッグカメラの初期位置設定
     Camera_Initialize(DEBUG_CAMERA_POSITION, DEBUG_CAMERA_FRONT, DEBUG_CAMERA_UP);
 #endif
 
@@ -180,8 +198,8 @@ void Game_Initialize()
 
     HpGauge_Initialize();
 
-    float screenWidth = static_cast<float>(Direct3D_GetBackBufferWidth());
-    float scoreX = screenWidth - SCORE_MARGIN_X - (22.0f * SCORE_DIGITS);
+    const float screenWidth = static_cast<float>(Direct3D_GetBackBufferWidth());
+    const float scoreX = screenWidth - SCORE_MARGIN_X - (22.0f * SCORE_DIGITS);
     Score_Initialize(scoreX, SCORE_MARGIN_Y, SCORE_DIGITS);
 
     GameTimer_Initialize(GAME_TIME_LIMIT);
@@ -205,21 +223,19 @@ void Game_Initialize()
     g_IsDebugDraw = false;
 #endif
 
-    XMFLOAT3 playerPos = Player_GetPosition();
+    // 初期敵スポーン
+    const XMFLOAT3 playerPos = Player_GetPosition();
     for (int i = 0; i < INITIAL_ENEMY_COUNT; i++)
     {
-        XMFLOAT3 spawnPos = Stage_GetGroundSpawnPosition(playerPos);
-        Enemy_Create(ENEMY_TYPE_GROUND, spawnPos);
+        Enemy_Create(ENEMY_TYPE_GROUND, Stage_GetGroundSpawnPosition(playerPos));
     }
 
-    // BGM再生
     SoundManager_PlayBGM(SOUND_BGM_GAME);
-
     Fade_Start(1.0, false);
 
     // パーティクルエミッター初期化
-    XMVECTOR emitterPos = XMVectorSet(0.0f, 2.0f, 5.0f, 0.0f);
-    g_pTestEmitter = new NormalEmitter(100, emitterPos, 10.0, true);
+    const XMVECTOR emitterPos = XMVectorSet(0.0f, 2.0f, 5.0f, 0.0f);
+    g_pTestEmitter = new NormalEmitter(60, emitterPos, 1000.0, true);
 }
 
 //======================================
@@ -227,12 +243,8 @@ void Game_Initialize()
 //======================================
 void Game_Finalize()
 {
-    // パーティクル解放
-    if (g_pTestEmitter)
-    {
-        delete g_pTestEmitter;
-        g_pTestEmitter = nullptr;
-    }
+    delete g_pTestEmitter;
+    g_pTestEmitter = nullptr;
 
 #ifdef _DEBUG
     DebugRenderer::Finalize();
@@ -256,7 +268,6 @@ void Game_Finalize()
     Enemy_Finalize();
     Player_Finalize();
 
-    // カメラ終了（リリースでも必要）
     Camera_Finalize();
     PLCamera_Finalize();
 
@@ -269,7 +280,7 @@ void Game_Finalize()
 //======================================
 void Game_Update(double elapsed_time)
 {
-    float dt = static_cast<float>(elapsed_time);
+    const float dt = static_cast<float>(elapsed_time);
 
     InputManager_Update();
 
@@ -325,14 +336,11 @@ static void UpdateSystems(float dt)
         Camera_Update(dt);
     }
     else
+#endif
     {
         PLCamera_Update(dt);
         Player_Update(dt);
     }
-#else
-    PLCamera_Update(dt);
-    Player_Update(dt);
-#endif
 }
 
 //--------------------------------------
@@ -352,7 +360,6 @@ static void UpdateObjects(float dt)
     BulletHItEffect_Update(dt);
     Trail_Update(dt);
 
-    // パーティクル更新
     if (g_pTestEmitter)
     {
         g_pTestEmitter->Update(dt);
@@ -364,8 +371,8 @@ static void UpdateObjects(float dt)
 //--------------------------------------
 static float GetCurrentSpawnInterval()
 {
-    float interval = ENEMY_SPAWN_INTERVAL_BASE - g_GameElapsedTime * SPAWN_RATE_INCREASE;
-    return std::max(interval, ENEMY_SPAWN_INTERVAL_MIN);
+    return std::max(ENEMY_SPAWN_INTERVAL_BASE - g_GameElapsedTime * SPAWN_RATE_INCREASE,
+                    ENEMY_SPAWN_INTERVAL_MIN);
 }
 
 //--------------------------------------
@@ -373,13 +380,8 @@ static float GetCurrentSpawnInterval()
 //--------------------------------------
 static ENEMY_TYPE GetRandomEnemyType()
 {
-    float r = static_cast<float>(rand()) / RAND_MAX;
-
-    if (r < FLYING_SPAWN_CHANCE)
-    {
-        return ENEMY_TYPE_FLYING;
-    }
-    return ENEMY_TYPE_GROUND;
+    const float r = static_cast<float>(rand()) / RAND_MAX;
+    return (r < FLYING_SPAWN_CHANCE) ? ENEMY_TYPE_FLYING : ENEMY_TYPE_GROUND;
 }
 
 //--------------------------------------
@@ -389,32 +391,19 @@ static void UpdateEnemySpawn(float dt)
 {
     g_EnemySpawnTimer += dt;
 
-    float spawnInterval = GetCurrentSpawnInterval();
+    if (g_EnemySpawnTimer < GetCurrentSpawnInterval()) return;
 
-    if (g_EnemySpawnTimer >= spawnInterval)
-    {
-        g_EnemySpawnTimer = 0.0f;
+    g_EnemySpawnTimer = 0.0f;
 
-        if (Enemy_GetAliveCount() >= MAX_ENEMIES)
-        {
-            return;
-        }
+    if (Enemy_GetAliveCount() >= MAX_ENEMIES) return;
 
-        XMFLOAT3 playerPos = Player_GetPosition();
-        ENEMY_TYPE enemyType = GetRandomEnemyType();
+    const XMFLOAT3 playerPos = Player_GetPosition();
+    const ENEMY_TYPE enemyType = GetRandomEnemyType();
+    const XMFLOAT3 spawnPos = (enemyType == ENEMY_TYPE_FLYING)
+        ? Stage_GetFlyingSpawnPosition(playerPos)
+        : Stage_GetGroundSpawnPosition(playerPos);
 
-        XMFLOAT3 spawnPos;
-        if (enemyType == ENEMY_TYPE_FLYING)
-        {
-            spawnPos = Stage_GetFlyingSpawnPosition(playerPos);
-        }
-        else
-        {
-            spawnPos = Stage_GetGroundSpawnPosition(playerPos);
-        }
-
-        Enemy_Create(enemyType, spawnPos);
-    }
+    Enemy_Create(enemyType, spawnPos);
 }
 
 //--------------------------------------
@@ -422,15 +411,13 @@ static void UpdateEnemySpawn(float dt)
 //--------------------------------------
 static void UpdateLightCamera()
 {
-    XMFLOAT3 playerPos = Player_GetPosition();
+    const XMFLOAT3 playerPos = Player_GetPosition();
 
-    XMFLOAT3 lightPos = {
+    LightCamera_SetPosition({
         playerPos.x + LIGHT_OFFSET.x,
         LIGHT_OFFSET.y,
         playerPos.z + LIGHT_OFFSET.z
-    };
-
-    LightCamera_SetPosition(lightPos);
+                            });
     LightCamera_SetFront({ LIGHT_DIRECTION.x, LIGHT_DIRECTION.y, LIGHT_DIRECTION.z });
     LightCamera_SetRange(50.0f, 50.0f, 1.0f, 200.0f);
 }
@@ -442,7 +429,7 @@ static void UpdateCollisions()
 {
     for (int i = Bullet_GetBulletCount() - 1; i >= 0; i--)
     {
-        XMFLOAT3 bulletPos = Bullet_GetPosition(i);
+        const XMFLOAT3 bulletPos = Bullet_GetPosition(i);
         if (!Stage_IsInsidePlayArea(bulletPos))
         {
             BulletHItEffect_Create(bulletPos);
@@ -458,22 +445,26 @@ static void CheckGameEnd()
 {
     if (g_IsTransitioning) return;
 
+    bool shouldEnd = false;
+    double fadeDuration = 0.0;
+
     if (GameTimer_IsTimeUp())
     {
-        g_IsGameOver = true;
-        g_IsTransitioning = true;
-        Score_SaveFinal();
-        Fade_Start(1.5, true);
-        return;
+        shouldEnd = true;
+        fadeDuration = 1.5;
+    }
+    else if (Player_GetHP() <= 0)
+    {
+        shouldEnd = true;
+        fadeDuration = 2.0;
     }
 
-    if (Player_GetHP() <= 0)
+    if (shouldEnd)
     {
         g_IsGameOver = true;
         g_IsTransitioning = true;
         Score_SaveFinal();
-        Fade_Start(2.0, true);
-        return;
+        Fade_Start(fadeDuration, true);
     }
 }
 
@@ -493,18 +484,16 @@ static void ProcessDebugInput()
         g_IsDebugDraw = !g_IsDebugDraw;
     }
 
+    const XMFLOAT3 playerPos = Player_GetPosition();
+
     if (KeyLogger_IsTrigger(KK_P))
     {
-        XMFLOAT3 playerPos = Player_GetPosition();
-        XMFLOAT3 spawnPos = Stage_GetGroundSpawnPosition(playerPos);
-        Enemy_Create(ENEMY_TYPE_GROUND, spawnPos);
+        Enemy_Create(ENEMY_TYPE_GROUND, Stage_GetGroundSpawnPosition(playerPos));
     }
 
     if (KeyLogger_IsTrigger(KK_U))
     {
-        XMFLOAT3 playerPos = Player_GetPosition();
-        XMFLOAT3 spawnPos = Stage_GetFlyingSpawnPosition(playerPos);
-        Enemy_Create(ENEMY_TYPE_FLYING, spawnPos);
+        Enemy_Create(ENEMY_TYPE_FLYING, Stage_GetFlyingSpawnPosition(playerPos));
     }
 }
 #endif
@@ -527,9 +516,7 @@ void Game_DrawShadow()
 void Game_Draw()
 {
     PostProcess_BeginScene();
-
     DrawScene();
-
     PostProcess_EndScene();
 
     Direct3D_DepthStencilStateDepthIsEnable(false);
@@ -543,8 +530,8 @@ void Game_Draw()
     Direct3D_DepthStencilStateDepthIsEnable(true);
 
 #ifdef _DEBUG
-    XMFLOAT4X4 mtxView = g_IsDebugCamera ? Camera_GetViewMatrix() : PLCamera_GetViewMatrix();
-    XMFLOAT4X4 mtxProj = g_IsDebugCamera ? Camera_GetPerspectiveMatrix() : PLCamera_GetPerspectiveMatrix();
+    XMFLOAT4X4 mtxView, mtxProj;
+    GetActiveMatrices(mtxView, mtxProj);
     DrawDebugOverlay(mtxView, mtxProj);
 #endif
 }
@@ -556,13 +543,8 @@ static void DrawScene()
 {
     Direct3D_DepthStencilStateDepthIsEnable(true);
 
-#ifdef _DEBUG
-    XMFLOAT4X4 mtxView = g_IsDebugCamera ? Camera_GetViewMatrix() : PLCamera_GetViewMatrix();
-    XMFLOAT4X4 mtxProj = g_IsDebugCamera ? Camera_GetPerspectiveMatrix() : PLCamera_GetPerspectiveMatrix();
-#else
-    XMFLOAT4X4 mtxView = PLCamera_GetViewMatrix();
-    XMFLOAT4X4 mtxProj = PLCamera_GetPerspectiveMatrix();
-#endif
+    XMFLOAT4X4 mtxView, mtxProj;
+    GetActiveMatrices(mtxView, mtxProj);
 
     Camera_SetMatrix(XMLoadFloat4x4(&mtxView), XMLoadFloat4x4(&mtxProj));
     Billboard_SetViewMatrix(mtxView);
@@ -570,11 +552,13 @@ static void DrawScene()
     Light_SetDirectional_World(LIGHT_DIRECTION, LIGHT_COLOR);
     Light_SetAmbient(AMBIENT_COLOR);
 
+    // スカイボックス（深度テスト不要）
     Direct3D_DepthStencilStateDepthIsEnable(false);
     Skybox_SetPosition(Player_GetPosition());
     Skybox_Draw();
     Direct3D_DepthStencilStateDepthIsEnable(true);
 
+    // 不透明オブジェクト
     Stage_Draw();
     PropManager_Draw();
     Enemy_Draw();
@@ -583,13 +567,20 @@ static void DrawScene()
 
     Blade_Draw();
 
+    // 半透明・エフェクト
     BulletHItEffect_Draw();
     Trail_Draw();
 
-    // パーティクル描画
+    // パーティクル描画（加算合成・深度書き込み無効）
     if (g_pTestEmitter)
     {
+        Direct3D_SetDepthWriteEnable(false);
+        Direct3D_SetBlendState(BlendMode::Add);
+
         g_pTestEmitter->Draw();
+
+        Direct3D_SetDepthWriteEnable(true);
+        Direct3D_SetBlendState(BlendMode::Alpha);
     }
 }
 

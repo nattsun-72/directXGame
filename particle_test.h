@@ -17,6 +17,8 @@
 class NormalParticle : public Particle {
 private:
     int m_texId = -1;
+    float m_scale = 1.0f;
+    float m_alpha = 1.0f;
 
 public:
     NormalParticle(int texId, const DirectX::XMVECTOR& position, const DirectX::XMVECTOR& velocity, double lifeTime)
@@ -29,20 +31,11 @@ public:
 
 class NormalEmitter : public Emitter {
 private:
-    static constexpr float MIN_DIRECTION = -DirectX::XM_PI;
-    static constexpr float MAX_DIRECTION = DirectX::XM_PI;
-
-    static constexpr float MIN_SPEED = 1.0f;
-    static constexpr float MAX_SPEED = 5.0f;
-
-    static constexpr float MIN_LIFE_TIME = 0.5f;
-    static constexpr float MAX_LIFE_TIME = 1.0f;
+    
 
     int m_texId = -1;
     std::mt19937 m_mt{ std::random_device{}() };
-    std::uniform_real_distribution<float> m_dirDist{ MIN_DIRECTION, MAX_DIRECTION };
-    std::uniform_real_distribution<float> m_speedDist{ MIN_SPEED, MAX_SPEED };
-    std::uniform_real_distribution<float> m_lifeTimeDist{ MIN_LIFE_TIME, MAX_LIFE_TIME };
+    
 
 protected:
     Particle* CreateParticle() override;

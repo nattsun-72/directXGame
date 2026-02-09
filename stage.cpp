@@ -167,7 +167,7 @@ void Stage_DrawShadow()
 {
     // 地形シャドウ
     XMMATRIX mtxWorld = XMMatrixIdentity();
-    MeshField_DrawShadow(mtxWorld);
+    //MeshField_DrawShadow(mtxWorld);
 
     // 壁シャドウ
     for (int i = 0; i < WALL_COUNT; i++)
